@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace PerusahaanAirMineral
 {
@@ -125,40 +127,87 @@ namespace PerusahaanAirMineral
                                 {
                                     try
                                     {
-                                        Console.WriteLine("Masukkan Id Produk (Format: p_0000):");
-                                        string idProduk = Console.ReadLine();
-                                        if (idProduk.ToLower() == "exit")
+                                        Console.WriteLine("Masukkan ID Produk (Format: p_0000):");
+                                        string idProduk = Console.ReadLine()?.Trim();
+                                        if (idProduk?.ToLower() == "exit")
                                         {
                                             return;
                                         }
 
-                                        if (!idProduk.StartsWith("p_") || !idProduk.Substring(2).All(char.IsDigit) || idProduk.Length != 6)
+                                        if (string.IsNullOrEmpty(idProduk) || !idProduk.StartsWith("p_") || !idProduk.Substring(2).All(char.IsDigit) || idProduk.Length != 6)
                                         {
-                                            throw new FormatException("Format id_produk tidak valid. Harap masukkan sesuai format: p_0000");
+                                            throw new FormatException("Format ID Produk tidak valid. Harap masukkan sesuai format: p_0000");
                                         }
 
-                                        Console.WriteLine("Masukkan Nama Produk :");
-                                        string namaProduk = Console.ReadLine();
-                                        Console.WriteLine("Masukkan Deskripsi Produk :");
-                                        string deskripsi = Console.ReadLine();
+                                        if (isProductExists(idProduk, conn))
+                                        {
+                                            Console.WriteLine($"ID produk {idProduk} sudah ada. Masukkan ID produk yang berbeda.");
+                                            continue; 
+                                        }
+
+                                        Console.WriteLine("Masukkan Nama Produk:");
+                                        string namaProduk = Console.ReadLine()?.Trim();
+                                        while (string.IsNullOrEmpty(namaProduk))
+                                        {
+                                            Console.WriteLine("Nama Produk tidak boleh kosong. Harap masukkan nama produk:");
+                                            namaProduk = Console.ReadLine()?.Trim();
+                                        }
+
+                                        Console.WriteLine("Masukkan Deskripsi Produk:");
+                                        string deskripsi = Console.ReadLine()?.Trim();
+                                        while (string.IsNullOrWhiteSpace(deskripsi))
+                                        {
+                                            Console.WriteLine("Deskripsi Produk tidak boleh kosong. Harap masukkan deskripsi produk:");
+                                            deskripsi = Console.ReadLine()?.Trim();
+                                        }
                                         Console.WriteLine("Masukkan Tanggal Kadaluarsa (YYYY-MM-DD):");
-                                        DateTime tglKadaluarsa = DateTime.Parse(Console.ReadLine());
-                                        Console.WriteLine("Masukkan Stok Produk :");
-                                        int stok = int.Parse(Console.ReadLine());
-
-                                        if (stok < 0)
+                                        DateTime tglKadaluarsa;
+                                        string inputTanggal = Console.ReadLine()?.Trim();
+                                        while (!DateTime.TryParseExact(inputTanggal, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out tglKadaluarsa) || tglKadaluarsa < DateTime.Today)
                                         {
-                                            throw new FormatException("Stok tidak valid. Harap masukkan angka tidak kurang dari 0.");
+                                            if (string.IsNullOrWhiteSpace(inputTanggal))
+                                            {
+                                                Console.WriteLine("Tanggal kadaluarsa tidak valid. Harap masukkan tanggal dalam format YYYY-MM-DD:");
+                                            }
+                                            else if (tglKadaluarsa < DateTime.Today)
+                                            {
+                                                Console.WriteLine("Tanggal kadaluarsa tidak valid. Harap masukkan tanggal setelah hari ini (YYYY-MM-DD):");
+                                            }
+                                            else
+                                            {
+                                                Console.WriteLine("Format tanggal tidak valid. Harap masukkan tanggal dalam format YYYY-MM-DD:");
+                                            }
+                                            inputTanggal = Console.ReadLine()?.Trim();
                                         }
 
-                                        Console.WriteLine("Masukkan Jumlah Tersedia :");
-                                        int jumlahTersedia = int.Parse(Console.ReadLine());
 
-                                        if (jumlahTersedia < 0)
+                                        Console.WriteLine("Masukkan Stok Produk:");
+                                        int stok;
+                                        while (!int.TryParse(Console.ReadLine()?.Trim(), out stok) || stok < 1)
                                         {
-                                            throw new FormatException("Jumlah Tersedia tidak valid. Harap masukkan angka tidak kurang dari 0.");
+                                            if (stok < 1)
+                                            {
+                                                Console.WriteLine("Stok tidak valid. Harap masukkan angka tidak kurang dari 1:");
+                                            }
+                                            else
+                                            {
+                                                Console.WriteLine("Stok tidak valid. Harap masukkan angka:");
+                                            }
                                         }
 
+                                        Console.WriteLine("Masukkan Jumlah Tersedia:");
+                                        int jumlahTersedia;
+                                        while (!int.TryParse(Console.ReadLine()?.Trim(), out jumlahTersedia) || jumlahTersedia < 1)
+                                        {
+                                            if (jumlahTersedia < 1)
+                                            {
+                                                Console.WriteLine("Jumlah Tersedia tidak valid. Harap masukkan angka tidak kurang dari 1:");
+                                            }
+                                            else
+                                            {
+                                                Console.WriteLine("Jumlah Tersedia tidak valid. Harap masukkan angka:");
+                                            }
+                                        }
                                         insert(idProduk, namaProduk, deskripsi, tglKadaluarsa, stok, jumlahTersedia, conn);
                                         inputValid = true;
                                     }
@@ -166,6 +215,10 @@ namespace PerusahaanAirMineral
                                     {
                                         Console.Clear();
                                         Console.WriteLine("\n" + ex.Message + "\n");
+                                    }
+                                    catch (SqlException ex) when (ex.Number == 2627)
+                                    {
+                                        Console.WriteLine($"ID produk  sudah ada. Masukkan ID produk yang berbeda.");
                                     }
                                     catch (Exception e)
                                     {
@@ -176,16 +229,16 @@ namespace PerusahaanAirMineral
                             }
                             break;
 
-
                         case '2':
                             {
+                                EditMenu:
                                 Console.Clear();
                                 Console.WriteLine("Edit Produk\n");
                                 string Id;
 
                                 while (true)
                                 {
-                                    Console.WriteLine("Masukkan Id Produk yang ingin diUbah:");
+                                    Console.WriteLine("Masukkan Id Produk yang ingin diUbah (ketik 'exit' untuk kembali):");
                                     Id = Console.ReadLine();
                                     if (Id.ToLower() == "exit")
                                     {
@@ -208,34 +261,121 @@ namespace PerusahaanAirMineral
                                 {
                                     try
                                     {
-                                        Console.WriteLine("Masukkan Nama Produk Baru:");
-                                        string newNama = Console.ReadLine();
-                                        if (newNama.ToLower() == "exit")
-                                        {
-                                            return;
-                                        }
-                                        Console.WriteLine("Masukkan Deskripsi Baru:");
-                                        string newDeskripsi = Console.ReadLine();
-                                        Console.WriteLine("Masukkan Tanggal Kadaluarsa Baru (YYYY-MM-DD):");
-                                        DateTime newTgl = DateTime.Parse(Console.ReadLine());
-                                        Console.WriteLine("Masukkan Stok Baru:");
-                                        int newStok = int.Parse(Console.ReadLine());
+                                        Console.WriteLine("\nPilih data yang ingin diubah:\n");
+                                        Console.WriteLine("1. Nama Produk");
+                                        Console.WriteLine("2. Deskripsi Produk");
+                                        Console.WriteLine("3. Tanggal Kadaluarsa");
+                                        Console.WriteLine("4. Stok");
+                                        Console.WriteLine("5. Jumlah Tersedia");
+                                        Console.WriteLine("6. Selesai");
 
-                                        if (newStok < 0)
+                                        Console.Write("\nPilihan Anda: ");
+                                        int choice;
+                                        while (!int.TryParse(Console.ReadLine(), out choice) || choice < 1 || choice > 6)
                                         {
-                                            throw new FormatException("Stok baru tidak valid. Harap masukkan angka tidak kurang dari 0.");
+                                            Console.WriteLine("Masukkan angka dari 1 hingga 6 sesuai dengan pilihan yang tersedia.");
+                                            Console.Write("Pilihan Anda: ");
                                         }
 
-                                        Console.WriteLine("Masukkan Jumlah Tersedia Baru:");
-                                        int newJumlah = int.Parse(Console.ReadLine());
+                                        string newNama;
+                                        string newDeskripsi;
+                                        int newStok;
+                                        int newJumlah;
 
-                                        if (newJumlah < 0)
+                                        switch (choice)
                                         {
-                                            throw new FormatException("Jumlah tersedia baru tidak valid. Harap masukkan angka tidak kurang dari 0.");
-                                        }
+                                            case 1:
+                                                Console.Clear();
+                                                Console.WriteLine("\nMasukkan Nama Produk Baru:");
+                                                newNama = Console.ReadLine()?.Trim();
+                                                while (string.IsNullOrEmpty(newNama))
+                                                {
+                                                    Console.WriteLine("Nama Produk tidak boleh kosong. Harap masukkan nama produk:");
+                                                    newNama = Console.ReadLine()?.Trim();
+                                                }
+                                                update(Id, newNama, null, default(DateTime), 0, 0, conn);
+                                                break;
 
-                                        update(Id, newNama, newDeskripsi, newTgl, newStok, newJumlah, conn);
-                                        inputValid = true;
+                                            case 2:
+                                                Console.Clear();
+                                                Console.WriteLine("\nMasukkan Deskripsi Produk Baru:");
+                                                newDeskripsi = Console.ReadLine()?.Trim();
+                                                while (string.IsNullOrWhiteSpace(newDeskripsi))
+                                                {
+                                                    Console.WriteLine("Deskripsi Produk tidak boleh kosong. Harap masukkan deskripsi produk:");
+                                                    newDeskripsi = Console.ReadLine()?.Trim();
+                                                }
+                                                update(Id, null, newDeskripsi, default(DateTime), 0, 0, conn);
+                                                break;
+
+                                            case 3:
+                                                Console.Clear();
+                                                Console.WriteLine("\nMasukkan Tanggal Kadaluarsa Baru (YYYY-MM-DD):");
+                                                DateTime newExpirationDate;
+                                                string inputTanggal = Console.ReadLine()?.Trim();
+                                                while (!DateTime.TryParseExact(inputTanggal, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out newExpirationDate) || newExpirationDate < DateTime.Today)
+                                                {
+                                                    if (string.IsNullOrWhiteSpace(inputTanggal))
+                                                    {
+                                                        Console.WriteLine("Tanggal kadaluarsa tidak valid. Harap masukkan tanggal dalam format YYYY-MM-DD:");
+                                                    }
+                                                    else if (newExpirationDate < DateTime.Today)
+                                                    {
+                                                        Console.WriteLine("Tanggal kadaluarsa tidak valid. Harap masukkan tanggal setelah hari ini (YYYY-MM-DD):");
+                                                    }
+                                                    else
+                                                    {
+                                                        Console.WriteLine("Format tanggal tidak valid. Harap masukkan tanggal dalam format YYYY-MM-DD:");
+                                                    }
+                                                    inputTanggal = Console.ReadLine()?.Trim();
+                                                }
+                                                update(Id, null, null, newExpirationDate, 0, 0, conn);
+                                                break;
+
+                                            case 4:
+                                                Console.Clear();
+                                                Console.WriteLine("\nMasukkan Stok Baru:");
+                                                while (!int.TryParse(Console.ReadLine()?.Trim(), out newStok) || newStok < 0)
+                                                {
+                                                    if (newStok < 0)
+                                                    {
+                                                        Console.WriteLine("Stok baru tidak valid. Harap masukkan angka tidak kurang dari 0:");
+                                                    }
+                                                    else
+                                                    {
+                                                        Console.WriteLine("Stok baru tidak valid. Harap masukkan angka:");
+                                                    }
+                                                }
+                                                update(Id, null, null, default(DateTime), newStok, 0, conn);
+                                                break;
+
+                                            case 5:
+                                                Console.Clear();
+                                                Console.WriteLine("\nMasukkan Jumlah Tersedia Baru:");
+                                                while (!int.TryParse(Console.ReadLine()?.Trim(), out newJumlah) || newJumlah < 0)
+                                                {
+                                                    if (newJumlah < 0)
+                                                    {
+                                                        Console.WriteLine("Jumlah Tersedia baru tidak valid. Harap masukkan angka tidak kurang dari 0:");
+                                                    }
+                                                    else
+                                                    {
+                                                        Console.WriteLine("Jumlah Tersedia baru tidak valid. Harap masukkan angka:");
+                                                    }
+                                                }
+                                                update(Id, null, null, default(DateTime), 0, newJumlah, conn);
+                                                break;
+
+                                            case 6:
+                                                Console.Clear();
+                                                inputValid = true;
+                                                goto EditMenu;
+
+                                            default:
+                                                Console.Clear();
+                                                Console.WriteLine("Pilihan tidak valid.");
+                                                break;
+                                        }
                                     }
                                     catch (FormatException ex)
                                     {
@@ -250,7 +390,6 @@ namespace PerusahaanAirMineral
                                 }
                             }
                             break;
-
 
                         case '3':
                             {
@@ -274,7 +413,7 @@ namespace PerusahaanAirMineral
                                     else
                                     {
                                         Console.Clear();
-                                        Console.WriteLine("\nMasukkan Id_produk yang sesuai.\n");
+                                        Console.WriteLine("\nId_produk yang dimasukkan tidak sesuai.\n");
                                     }
                                 }
 
@@ -285,8 +424,16 @@ namespace PerusahaanAirMineral
                                 }
                                 catch (Exception e)
                                 {
-                                    Console.WriteLine("\nGagal menghapus data produk.");
-                                    Console.WriteLine(e.ToString());
+                                    if (e is SqlException sqlEx && sqlEx.Number == 547)
+                                    {
+                                        Console.WriteLine("Tidak dapat menghapus produk karena masih ada data terkait.");
+                                        Console.WriteLine("Silakan hapus terlebih dahulu data terkait.");
+                                    }
+                                    else
+                                    {
+                                        Console.WriteLine("\nGagal menghapus data produk.");
+                                        Console.WriteLine(e.ToString());
+                                    }
                                 }
                             }
                             break;
@@ -420,14 +567,56 @@ namespace PerusahaanAirMineral
 
         public void update(string Id, string newNama, string newDeskripsi, DateTime newTgl, int newStok, int newJumlah, SqlConnection con)
         {
-            string str = "UPDATE Produk SET Nama_produk = @newNama, Deskripsi = @newDeskripsi, Tgl_Kadaluarsa = @newTgl, Stok = @newStok, Jumlah_tersedia = @newJumlah WHERE Id_produk = @Id";
+            string str = "UPDATE Produk SET ";
+
+            if (!string.IsNullOrEmpty(newNama))
+            {
+                str += "Nama_produk = @newNama, ";
+            }
+            if (!string.IsNullOrEmpty(newDeskripsi))
+            {
+                str += "Deskripsi = @newDeskripsi, ";
+            }
+            if (newTgl != default(DateTime))
+            {
+                str += "Tgl_Kadaluarsa = @newTgl, ";
+            }
+            if (newStok >= 0)
+            {
+                str += "Stok = @newStok, ";
+            }
+            if (newJumlah >= 0)
+            {
+                str += "Jumlah_tersedia = @newJumlah, ";
+            }
+
+            str = str.TrimEnd(',', ' ');
+
+            str += " WHERE Id_produk = @Id";
+
             SqlCommand cmd = new SqlCommand(str, con);
             cmd.Parameters.AddWithValue("@Id", Id);
-            cmd.Parameters.AddWithValue("@newNama", newNama);
-            cmd.Parameters.AddWithValue("@newDeskripsi", newDeskripsi);
-            cmd.Parameters.AddWithValue("@newTgl", newTgl);
-            cmd.Parameters.AddWithValue("@newStok", newStok);
-            cmd.Parameters.AddWithValue("@newJumlah", newJumlah);
+            if (!string.IsNullOrEmpty(newNama))
+            {
+                cmd.Parameters.AddWithValue("@newNama", newNama);
+            }
+            if (!string.IsNullOrEmpty(newDeskripsi))
+            {
+                cmd.Parameters.AddWithValue("@newDeskripsi", newDeskripsi);
+            }
+            if (newTgl != default(DateTime))
+            {
+                cmd.Parameters.AddWithValue("@newTgl", newTgl);
+            }
+            if (newStok >= 0)
+            {
+                cmd.Parameters.AddWithValue("@newStok", newStok);
+            }
+            if (newJumlah >= 0)
+            {
+                cmd.Parameters.AddWithValue("@newJumlah", newJumlah);
+            }
+
             cmd.ExecuteNonQuery();
             Console.WriteLine("Data Berhasil Diubah");
         }
@@ -470,32 +659,103 @@ namespace PerusahaanAirMineral
                                     try
                                     {
                                         Console.WriteLine("Masukkan ID Penjualan (Format: ip_00000):");
-                                        string idPenjualan = Console.ReadLine();
-                                        if (idPenjualan.ToLower() == "exit")
+                                        string idPenjualan = Console.ReadLine()?.Trim();
+                                        if (idPenjualan?.ToLower() == "exit")
                                         {
                                             return;
                                         }
 
-                                        if (!idPenjualan.StartsWith("ip_") || !idPenjualan.Substring(3).All(char.IsDigit) || idPenjualan.Length != 8)
+                                        if (string.IsNullOrEmpty(idPenjualan) || !idPenjualan.StartsWith("ip_") || !idPenjualan.Substring(3).All(char.IsDigit) || idPenjualan.Length != 8)
                                         {
                                             throw new FormatException("Format ID Penjualan tidak valid. Harap masukkan sesuai format: ip_00000");
                                         }
 
-                                        Console.WriteLine("Masukkan Tanggal Penjualan (YYYY-MM-DD):");
-                                        DateTime tanggalPenjualan = DateTime.Parse(Console.ReadLine());
-                                        Console.WriteLine("Masukkan Jumlah Terjual:");
-                                        int jumlahTerjual = int.Parse(Console.ReadLine());
-                                        Console.WriteLine("Masukkan Harga Jual:");
-                                        decimal hargaJual = decimal.Parse(Console.ReadLine());
-                                        Console.WriteLine("Masukkan Metode Pembayaran:");
-                                        string metodePembayaran = Console.ReadLine();
-                                        Console.WriteLine("Masukkan ID Produk (Format: p_0000):");
-                                        string idProduk = Console.ReadLine();
-
-                                       if (!idProduk.StartsWith("p_") || !idProduk.Substring(2).All(char.IsDigit) || idProduk.Length != 6)
+                                        if (isPenjualanExists(idPenjualan, conn))
                                         {
-                                            throw new FormatException("Format ID Produk tidak valid. Harap masukkan sesuai format: p_0000");
+                                            Console.WriteLine($"ID penjualan {idPenjualan} sudah ada. Masukkan ID penjualan yang berbeda.");
+                                            continue;
                                         }
+
+                                        Console.WriteLine("Masukkan Tanggal Penjualan (YYYY-MM-DD):");
+                                        DateTime tanggalPenjualan;
+                                        string inputTanggalPenjualan = Console.ReadLine()?.Trim();
+                                        while (!DateTime.TryParseExact(inputTanggalPenjualan, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out tanggalPenjualan) || tanggalPenjualan > DateTime.Today)
+                                        {
+                                            if (string.IsNullOrWhiteSpace(inputTanggalPenjualan))
+                                            {
+                                                Console.WriteLine("Tanggal penjualan tidak valid. Harap masukkan tanggal dalam format YYYY-MM-DD:");
+                                            }
+                                            else if (tanggalPenjualan > DateTime.Today)
+                                            {
+                                                Console.WriteLine("Tanggal penjualan tidak valid. Harap masukkan tanggal hari ini atau sebelum hari ini (YYYY-MM-DD):");
+                                            }
+                                            else
+                                            {
+                                                Console.WriteLine("Format tanggal tidak valid. Harap masukkan tanggal dalam format YYYY-MM-DD:");
+                                            }
+                                            inputTanggalPenjualan = Console.ReadLine()?.Trim();
+                                        }
+
+
+                                        Console.WriteLine("Masukkan Jumlah Terjual:");
+                                        int jumlahTerjual;
+                                        while (!int.TryParse(Console.ReadLine()?.Trim(), out jumlahTerjual) || jumlahTerjual < 1)
+                                        {
+                                            if (jumlahTerjual < 1)
+                                            {
+                                                Console.WriteLine("Jumlah Terjual tidak valid. Harap masukkan angka tidak kurang dari 1:");
+                                            }
+                                            else
+                                            {
+                                                Console.WriteLine("Jumlah Terjual tidak valid. Harap masukkan angka:");
+                                            }
+                                        }
+
+                                        Console.WriteLine("Masukkan Harga Jual:");
+                                        decimal hargaJual;
+                                        while (!decimal.TryParse(Console.ReadLine()?.Trim(), out hargaJual) || hargaJual < 1)
+                                        {
+                                            if (hargaJual < 1)
+                                            {
+                                                Console.WriteLine("Harga Jual tidak valid. Harap masukkan angka tidak kurang dari 1:");
+                                            }
+                                            else
+                                            {
+                                                Console.WriteLine("Harga Jual tidak valid. Harap masukkan angka:");
+                                            }
+                                        }
+
+                                        Console.WriteLine("Masukkan Metode Pembayaran:");
+                                        string metodePembayaran = Console.ReadLine()?.Trim();
+                                        while (string.IsNullOrEmpty(metodePembayaran))
+                                        {
+                                            Console.WriteLine("Metode Pembayaran tidak boleh kosong. Harap masukkan metode pembayaran:");
+                                            metodePembayaran = Console.ReadLine()?.Trim();
+                                        }
+
+                                        string idProduk;
+                                        bool isIdProdukValid = false;
+                                        do
+                                        {
+                                            Console.WriteLine("Masukkan ID Produk (Format: p_0000):");
+                                            idProduk = Console.ReadLine()?.Trim();
+
+                                            if (!idProduk.StartsWith("p_") || !idProduk.Substring(2).All(char.IsDigit) || idProduk.Length != 6)
+                                            {
+                                                Console.WriteLine("Format ID Produk tidak valid. Harap masukkan sesuai format: p_0000");
+                                            }
+                                            else
+                                            {
+                                                if (isProdukExists(idProduk, conn))
+                                                {
+                                                    isIdProdukValid = true;
+                                                }
+                                                else
+                                                {
+                                                    Console.WriteLine($"ID produk {idProduk} tidak ditemukan. Masukkan ID produk yang valid.");
+                                                }
+                                            }
+                                        } while (!isIdProdukValid);
 
                                         insertPenjualan(idPenjualan, tanggalPenjualan, jumlahTerjual, hargaJual, metodePembayaran, idProduk, conn);
                                         inputValid = true;
@@ -504,6 +764,10 @@ namespace PerusahaanAirMineral
                                     {
                                         Console.Clear();
                                         Console.WriteLine("\n" + ex.Message + "\n");
+                                    }
+                                    catch (SqlException ex) when (ex.Number == 2627)
+                                    {
+                                        Console.WriteLine($"ID penjualan sudah ada. Masukkan ID penjualan yang berbeda.");
                                     }
                                     catch (Exception e)
                                     {
@@ -514,9 +778,9 @@ namespace PerusahaanAirMineral
                             }
                             break;
 
-
                         case '2':
                             {
+                                EditMenu:
                                 Console.Clear();
                                 Console.WriteLine("Edit Penjualan\n");
                                 string Id;
@@ -546,34 +810,121 @@ namespace PerusahaanAirMineral
                                 {
                                     try
                                     {
-                                        Console.WriteLine("Masukkan Tanggal Penjualan Baru (YYYY-MM-DD):");
-                                        string inputTanggalPenjualan = Console.ReadLine();
-                                        if (inputTanggalPenjualan.ToLower() == "exit")
-                                        {
-                                            return;
-                                        }
-                                        DateTime newTanggalPenjualan = DateTime.Parse(inputTanggalPenjualan);
-                                        Console.WriteLine("Masukkan Jumlah Terjual Baru:");
-                                        int newJumlahTerjual = int.Parse(Console.ReadLine());
-                                        Console.WriteLine("Masukkan Harga Jual Baru:");
-                                        decimal newHargaJual = decimal.Parse(Console.ReadLine());
-                                        Console.WriteLine("Masukkan Metode Pembayaran Baru:");
-                                        string newMetodePembayaran = Console.ReadLine();
-                                        Console.WriteLine("Masukkan ID Produk Baru (Format: p_0000):");
-                                        string newIdProduk = Console.ReadLine();
+                                        Console.WriteLine("\nPilih data yang ingin diubah:\n");
+                                        Console.WriteLine("1. Tanggal Penjualan");
+                                        Console.WriteLine("2. Jumlah Terjual");
+                                        Console.WriteLine("3. Harga Jual");
+                                        Console.WriteLine("4. Metode Pembayaran");
+                                        Console.WriteLine("5. ID Produk");
+                                        Console.WriteLine("6. Selesai");
 
-                                        if (!newIdProduk.StartsWith("p_") || !newIdProduk.Substring(2).All(char.IsDigit) || newIdProduk.Length != 6)
+                                        Console.Write("\nPilihan Anda: ");
+                                        int choice;
+                                        while (!int.TryParse(Console.ReadLine(), out choice) || choice < 1 || choice > 6)
                                         {
-                                            throw new FormatException("Format ID Produk tidak valid. Harap masukkan sesuai format: p_0000");
+                                            Console.WriteLine("Masukkan angka dari 1 hingga 6 sesuai dengan pilihan yang tersedia.");
+                                            Console.Write("Pilihan Anda: ");
                                         }
 
-                                        update(Id, newTanggalPenjualan, newJumlahTerjual, newHargaJual, newMetodePembayaran, newIdProduk, conn);
-                                        inputValid = true;
-                                    }
-                                    catch (FormatException)
-                                    {
-                                        Console.Clear();
-                                        Console.WriteLine("\nFormat input tidak valid. Harap masukkan data yang sesuai.\n");
+                                        switch (choice)
+
+                                        {
+                                            case 1:
+                                                Console.Clear();
+                                                Console.WriteLine("\nMasukkan Tanggal Penjualan Baru (YYYY-MM-DD):");
+                                                DateTime newTanggalPenjualan;
+                                                string inputNewTanggalPenjualan = Console.ReadLine()?.Trim();
+                                                while (!DateTime.TryParseExact(inputNewTanggalPenjualan, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out newTanggalPenjualan) || newTanggalPenjualan > DateTime.Today)
+                                                {
+                                                    if (string.IsNullOrWhiteSpace(inputNewTanggalPenjualan))
+                                                    {
+                                                        Console.WriteLine("Tanggal penjualan tidak valid. Harap masukkan tanggal dalam format YYYY-MM-DD:");
+                                                    }
+                                                    else if (newTanggalPenjualan > DateTime.Today)
+                                                    {
+                                                        Console.WriteLine("Tanggal penjualan tidak valid. Harap masukkan tanggal hari ini atau sebelum hari ini (YYYY-MM-DD):");
+                                                    }
+                                                    else
+                                                    {
+                                                        Console.WriteLine("Format tanggal tidak valid. Harap masukkan tanggal dalam format YYYY-MM-DD:");
+                                                    }
+                                                    inputNewTanggalPenjualan = Console.ReadLine()?.Trim();
+                                                }
+                                                updatePenjualan(Id, newTanggalPenjualan, default, default, null, null, conn);
+                                                break;
+
+                                            case 2:
+                                                Console.Clear();
+                                                Console.WriteLine("\nMasukkan Jumlah Terjual Baru:");
+                                                int newJumlahTerjual;
+                                                while (!int.TryParse(Console.ReadLine()?.Trim(), out newJumlahTerjual) || newJumlahTerjual < 1)
+                                                {
+                                                    if (newJumlahTerjual < 1)
+                                                    {
+                                                        Console.WriteLine("Jumlah Terjual tidak valid. Harap masukkan angka tidak kurang dari 1:");
+                                                    }
+                                                    else
+                                                    {
+                                                        Console.WriteLine("Jumlah Terjual tidak valid. Harap masukkan angka:");
+                                                    }
+                                                }
+                                                updatePenjualan(Id, default, newJumlahTerjual, default, null, null, conn);
+                                                break;
+
+                                            case 3:
+                                                Console.Clear();
+                                                Console.WriteLine("\nMasukkan Harga Jual Baru:");
+                                                decimal newHargaJual;
+                                                while (!decimal.TryParse(Console.ReadLine()?.Trim(), out newHargaJual) || newHargaJual < 1)
+                                                {
+                                                    if (newHargaJual < 1)
+                                                    {
+                                                        Console.WriteLine("Harga Jual tidak valid. Harap masukkan angka tidak kurang dari 1:");
+                                                    }
+                                                    else
+                                                    {
+                                                        Console.WriteLine("Harga Jual tidak valid. Harap masukkan angka:");
+                                                    }
+                                                }
+                                                updatePenjualan(Id, default, default, newHargaJual, null, null, conn);
+                                                break;
+
+                                            case 4:
+                                                Console.Clear();
+                                                Console.WriteLine("\nMasukkan Metode Pembayaran Baru:");
+                                                string newMetodePembayaran = Console.ReadLine()?.Trim();
+                                                while (string.IsNullOrEmpty(newMetodePembayaran))
+                                                {
+                                                    Console.WriteLine("Metode Pembayaran tidak boleh kosong. Harap masukkan metode pembayaran:");
+                                                    newMetodePembayaran = Console.ReadLine()?.Trim();
+                                                }
+                                                updatePenjualan(Id, default, default, default, newMetodePembayaran, null, conn);
+                                                break;
+
+                                            case 5:
+                                                Console.Clear();
+                                                string newIdProduk;
+                                                do
+                                                {
+                                                    Console.WriteLine("\nMasukkan ID Produk Baru (Format: p_0000):");
+                                                    newIdProduk = Console.ReadLine()?.Trim();
+                                                    if (!newIdProduk.StartsWith("p_") || !newIdProduk.Substring(2).All(char.IsDigit) || newIdProduk.Length != 6)
+                                                    {
+                                                        Console.WriteLine("Format ID Produk tidak valid. Harap masukkan sesuai format: p_0000");
+                                                    }
+                                                } while (!newIdProduk.StartsWith("p_") || !newIdProduk.Substring(2).All(char.IsDigit) || newIdProduk.Length != 6);
+                                                updatePenjualan(Id, default, default, default, null, newIdProduk, conn);
+                                                break;
+
+                                            case 6:
+                                                Console.Clear();
+                                                inputValid = true;
+                                                goto EditMenu;
+                                            default:
+                                                Console.Clear();
+                                                Console.WriteLine("Pilihan tidak valid.");
+                                                break;
+                                        }
                                     }
                                     catch (Exception e)
                                     {
@@ -583,7 +934,6 @@ namespace PerusahaanAirMineral
                                 }
                             }
                             break;
-
                         case '3':
                             {
                                 Console.Clear();
@@ -617,9 +967,18 @@ namespace PerusahaanAirMineral
                                 }
                                 catch (Exception e)
                                 {
-                                    Console.WriteLine("\nGagal menghapus data penjualan.");
-                                    Console.WriteLine(e.ToString());
+                                    if (e is SqlException sqlEx && sqlEx.Number == 547)
+                                    {
+                                        Console.WriteLine("Tidak dapat menghapus penjualan karena masih ada data terkait di tabel Pelanggan.");
+                                        Console.WriteLine("Silakan hapus terlebih dahulu data terkait di tabel Pelanggan.");
+                                    }
+                                    else
+                                    {
+                                        Console.WriteLine("\nGagal menghapus data penjualan.");
+                                        Console.WriteLine(e.ToString());
+                                    }
                                 }
+
                             }
                             break;
 
@@ -676,6 +1035,7 @@ namespace PerusahaanAirMineral
                     Console.Clear();
                     Console.WriteLine("\nPeriksa nilai yang dimasukkan");
                 }
+
             }
         }
 
@@ -747,21 +1107,63 @@ namespace PerusahaanAirMineral
             r.Close();
         }
 
-        
-        public void update(string Id, DateTime newTanggalPenjualan, int newJumlahTerjual, decimal newHargaJual, string newMetodePembayaran, string newIdProduk, SqlConnection con)
+
+        public void updatePenjualan(string Id, DateTime newTanggalPenjualan, int newJumlahTerjual, decimal newHargaJual, string newMetodePembayaran, string newIdProduk, SqlConnection con)
         {
-            string str = "UPDATE Penjualan SET Tanggal_penjualan = @newTanggalPenjualan, Jumlah_terjual = @newJumlahTerjual, Harga_jual = @newHargaJual, " +
-                "Metode_pembayaran = @newMetodePembayaran, Id_produk = @newIdProduk WHERE Id_penjualan = @Id";
+            string str = "UPDATE Penjualan SET ";
+
+            if (newTanggalPenjualan != default(DateTime))
+            {
+                str += "Tanggal_penjualan = @newTanggalPenjualan, ";
+            }
+            if (newJumlahTerjual >= 0)
+            {
+                str += "Jumlah_terjual = @newJumlahTerjual, ";
+            }
+            if (newHargaJual >= 0)
+            {
+                str += "Harga_jual = @newHargaJual, ";
+            }
+            if (!string.IsNullOrEmpty(newMetodePembayaran))
+            {
+                str += "Metode_pembayaran = @newMetodePembayaran, ";
+            }
+            if (!string.IsNullOrEmpty(newIdProduk))
+            {
+                str += "Id_produk = @newIdProduk, ";
+            }
+
+            str = str.TrimEnd(',', ' ');
+
+            str += " WHERE Id_penjualan = @Id";
+
             SqlCommand cmd = new SqlCommand(str, con);
             cmd.Parameters.AddWithValue("@Id", Id);
-            cmd.Parameters.AddWithValue("@newTanggalPenjualan", newTanggalPenjualan);
-            cmd.Parameters.AddWithValue("@newJumlahTerjual", newJumlahTerjual);
-            cmd.Parameters.AddWithValue("@newHargaJual", newHargaJual);
-            cmd.Parameters.AddWithValue("@newMetodePembayaran", newMetodePembayaran);
-            cmd.Parameters.AddWithValue("@newIdProduk", newIdProduk);
+            if (newTanggalPenjualan != default(DateTime))
+            {
+                cmd.Parameters.AddWithValue("@newTanggalPenjualan", newTanggalPenjualan);
+            }
+            if (newJumlahTerjual >= 0)
+            {
+                cmd.Parameters.AddWithValue("@newJumlahTerjual", newJumlahTerjual);
+            }
+            if (newHargaJual >= 0)
+            {
+                cmd.Parameters.AddWithValue("@newHargaJual", newHargaJual);
+            }
+            if (!string.IsNullOrEmpty(newMetodePembayaran))
+            {
+                cmd.Parameters.AddWithValue("@newMetodePembayaran", newMetodePembayaran);
+            }
+            if (!string.IsNullOrEmpty(newIdProduk))
+            {
+                cmd.Parameters.AddWithValue("@newIdProduk", newIdProduk);
+            }
+
             cmd.ExecuteNonQuery();
             Console.WriteLine("Data Berhasil Diubah");
         }
+
 
         public bool isPenjualanExists(string idPenjualan, SqlConnection con)
         {
@@ -800,47 +1202,91 @@ namespace PerusahaanAirMineral
                                     try
                                     {
                                         Console.WriteLine("Masukkan Id Pelanggan (Format: pl_00000):");
-                                        string idPelanggan = Console.ReadLine();
-                                        if (idPelanggan.ToLower() == "exit")
+                                        string idPelanggan = Console.ReadLine()?.Trim();
+                                        if (idPelanggan?.ToLower() == "exit")
                                         {
                                             return;
                                         }
 
-                                        if (!idPelanggan.StartsWith("pl_") || !idPelanggan.Substring(3).All(char.IsDigit) || idPelanggan.Length != 8)
+                                        if (string.IsNullOrEmpty(idPelanggan) || !idPelanggan.StartsWith("pl_") || !idPelanggan.Substring(3).All(char.IsDigit) || idPelanggan.Length != 8)
                                         {
                                             throw new FormatException("Format ID Pelanggan tidak valid. Harap masukkan sesuai format: pl_00000");
                                         }
 
-                                        Console.WriteLine("Masukkan Nama Pelanggan:");
-                                        string namaPelanggan = Console.ReadLine();
-                                        Console.WriteLine("Masukkan Alamat Pelanggan:");
-                                        string alamat = Console.ReadLine();
-                                        Console.WriteLine("Masukkan Nomor Telepon Pelanggan:");
-                                        string noTelp = Console.ReadLine();
-
-                                        if (!noTelp.All(char.IsDigit) || noTelp.Length != 12)
+                                        if (isPelangganExists(idPelanggan, conn))
                                         {
-                                            throw new FormatException("Nomor Telepon tidak valid. Harap masukkan hanya angka dan panjang maksimum 12 digit.");
+                                            Console.WriteLine($"ID Pelanggan {idPelanggan} sudah ada. Masukkan ID pelanggan yang berbeda.");
+                                            continue;
                                         }
 
-                                        Console.WriteLine("Masukkan Email Pelanggan:");
-                                        string email = Console.ReadLine();
+                                        Console.WriteLine("Masukkan Nama Pelanggan:");
+                                        string namaPelanggan;
+                                        do
+                                        {
+                                            namaPelanggan = Console.ReadLine()?.Trim();
+                                            if (string.IsNullOrEmpty(namaPelanggan))
+                                            {
+                                                Console.WriteLine("Nama Pelanggan tidak boleh kosong. Harap masukkan nama pelanggan:");
+                                            }
+                                        } while (string.IsNullOrEmpty(namaPelanggan));
+
+                                        Console.WriteLine("Masukkan Alamat Pelanggan:");
+                                        string alamat;
+                                        do
+                                        {
+                                            alamat = Console.ReadLine()?.Trim();
+                                            if (string.IsNullOrEmpty(alamat))
+                                            {
+                                                Console.WriteLine("Alamat Pelanggan tidak boleh kosong. Harap masukkan alamat pelanggan:");
+                                            }
+                                        } while (string.IsNullOrEmpty(alamat));
+
+                                        Console.WriteLine("Masukkan Nomor Telepon Pelanggan:");
+                                        string noTelp;
+                                        do
+                                        {
+                                            noTelp = Console.ReadLine()?.Trim();
+                                            if (!noTelp.All(char.IsDigit) || noTelp.Length != 12)
+                                            {
+                                                Console.WriteLine("Nomor Telepon tidak valid. Harap masukkan hanya angka dan panjang maksimum 12 digit.");
+                                            }
+                                        } while (!noTelp.All(char.IsDigit) || noTelp.Length != 12);
+
+                                        string email;
+                                        do
+                                        {
+                                            Console.WriteLine("Masukkan Email Pelanggan:");
+                                            email = Console.ReadLine()?.Trim();
+                                            if (!IsValidemail(email))
+                                            {
+                                                Console.WriteLine("Email tidak valid. Harap masukkan email yang benar.");
+                                            }
+                                        } while (!IsValidemail(email));
+
                                         Console.WriteLine("Masukkan Id Penjualan (Format: ip_00000):");
-                                        string idPenjualan = Console.ReadLine();
+                                        string idPenjualan = Console.ReadLine()?.Trim();
 
                                         if (!idPenjualan.StartsWith("ip_") || !idPenjualan.Substring(3).All(char.IsDigit) || idPenjualan.Length != 8)
                                         {
                                             throw new FormatException("Format ID Penjualan tidak valid. Harap masukkan sesuai format: ip_00000");
                                         }
 
+                                        if (!isPenjualanExists(idPenjualan, conn))
+                                        {
+                                            throw new Exception($"ID penjualan {idPenjualan} tidak ditemukan. Masukkan ID penjualan yang valid.");
+                                        }
+
                                         insertPelanggan(idPelanggan, namaPelanggan, alamat, noTelp, email, idPenjualan, conn);
-                                        Console.WriteLine("Data Pelanggan Berhasil Ditambahkan");
                                         inputValid = true;
                                     }
                                     catch (FormatException ex)
                                     {
                                         Console.Clear();
                                         Console.WriteLine("\n" + ex.Message + "\n");
+                                    }
+                                    catch (SqlException ex) when (ex.Number == 2627)
+                                    {
+                                        Console.WriteLine($"ID pelanggan sudah ada. Masukkan ID pelanggan yang berbeda.");
                                     }
                                     catch (Exception e)
                                     {
@@ -853,13 +1299,14 @@ namespace PerusahaanAirMineral
 
                         case '2':
                             {
+                                EditMenu:
                                 Console.Clear();
                                 Console.WriteLine("Edit Pelanggan\n");
                                 string idPelanggan;
 
                                 while (true)
                                 {
-                                    Console.WriteLine("Masukkan Id Pelanggan yang ingin diubah:");
+                                    Console.WriteLine("Masukkan Id Pelanggan yang ingin diubah (ketik 'exit' untuk kembali):");
                                     idPelanggan = Console.ReadLine();
                                     if (idPelanggan.ToLower() == "exit")
                                     {
@@ -882,41 +1329,119 @@ namespace PerusahaanAirMineral
                                 {
                                     try
                                     {
-                                        Console.WriteLine("Masukkan Nama Pelanggan Baru:");
-                                        string newNamaPelanggan = Console.ReadLine();
-                                        if (newNamaPelanggan.ToLower() == "exit")
-                                        {
-                                            return;
-                                        }
-                                        Console.WriteLine("Masukkan Alamat Baru:");
-                                        string newAlamat = Console.ReadLine();
-                                        Console.WriteLine("Masukkan Nomor Telepon Baru:");
-                                        string newNoTelp = Console.ReadLine();
+                                        Console.WriteLine("\nPilih data yang ingin diubah:\n");
+                                        Console.WriteLine("1. Nama Pelanggan");
+                                        Console.WriteLine("2. Alamat");
+                                        Console.WriteLine("3. Nomor Telepon");
+                                        Console.WriteLine("4. Email");
+                                        Console.WriteLine("5. Id Penjualan");
+                                        Console.WriteLine("6. Selesai");
 
-                                        if (!newNoTelp.All(char.IsDigit) || newNoTelp.Length != 12)
+                                        Console.Write("\nPilihan Anda: ");
+                                        int choice;
+                                        while (!int.TryParse(Console.ReadLine(), out choice) || choice < 1 || choice > 6)
                                         {
-                                            throw new FormatException("Nomor Telepon tidak valid. Harap masukkan hanya angka dan panjang maksimum 12 digit.");
-                                        }
-
-                                        Console.WriteLine("Masukkan Email Baru:");
-                                        string newEmail = Console.ReadLine();
-                                        Console.WriteLine("Masukkan Id Penjualan (Format: ip_00000):");
-                                        string idPenjualan = Console.ReadLine();
-
-                                        if (!idPenjualan.StartsWith("ip_") || !idPenjualan.Substring(3).All(char.IsDigit) || idPenjualan.Length != 8)
-                                        {
-                                            throw new FormatException("Format ID Penjualan tidak valid. Harap masukkan sesuai format: ip_00000");
+                                            Console.WriteLine("Masukkan angka dari 1 hingga 6 sesuai dengan pilihan yang tersedia.");
+                                            Console.Write("Pilihan Anda: ");
                                         }
 
-                                        updatePelanggan(idPelanggan, newNamaPelanggan, newAlamat, newNoTelp, newEmail, idPenjualan, conn);
+                                        switch (choice)
+                                        {
+                                            case 1:
+                                                Console.Clear();
+                                                string newNama;
+                                                do
+                                                {
+                                                    Console.WriteLine("\nMasukkan Nama Pelanggan Baru:");
+                                                    newNama = Console.ReadLine()?.Trim();
+                                                    if (string.IsNullOrEmpty(newNama))
+                                                    {
+                                                        Console.WriteLine("Nama Pelanggan tidak boleh kosong.");
+                                                    }
+                                                } while (string.IsNullOrEmpty(newNama));
 
-                                        Console.WriteLine("Data Pelanggan Berhasil Diubah");
-                                        inputValid = true;
-                                    }
-                                    catch (FormatException ex)
-                                    {
-                                        Console.Clear();
-                                        Console.WriteLine("\n" + ex.Message + "\n");
+                                                updatePelanggan(idPelanggan, newNama, null, null, null, null, conn);
+                                                inputValid = true;
+                                                break;
+
+                                            case 2:
+                                                Console.Clear();
+                                                string newAlamat;
+                                                do
+                                                {
+                                                    Console.WriteLine("\nMasukkan Alamat Baru:");
+                                                    newAlamat = Console.ReadLine()?.Trim();
+                                                    if (string.IsNullOrEmpty(newAlamat))
+                                                    {
+                                                        Console.WriteLine("Alamat tidak boleh kosong.");
+                                                    }
+                                                } while (string.IsNullOrEmpty(newAlamat));
+
+                                                updatePelanggan(idPelanggan, null, newAlamat, null, null, null, conn);
+                                                inputValid = true;
+                                                break;
+
+                                            case 3:
+                                                Console.Clear();
+                                                string newNoTelp;
+                                                do
+                                                {
+                                                    Console.WriteLine("\nMasukkan Nomor Telepon Baru:");
+                                                    newNoTelp = Console.ReadLine()?.Trim();
+                                                    if (string.IsNullOrEmpty(newNoTelp))
+                                                    {
+                                                        Console.WriteLine("Nomor Telepon tidak boleh kosong.");
+                                                    }
+                                                } while (string.IsNullOrEmpty(newNoTelp));
+
+                                                updatePelanggan(idPelanggan, null, null, newNoTelp, null, null, conn);
+                                                inputValid = true;
+                                                break;
+
+                                            case 4:
+                                                Console.Clear();
+                                                string newEmail;
+                                                do
+                                                {
+                                                    Console.WriteLine("\nMasukkan Email Baru:");
+                                                    newEmail = Console.ReadLine()?.Trim();
+                                                    if (string.IsNullOrEmpty(newEmail))
+                                                    {
+                                                        Console.WriteLine("Email tidak boleh kosong.");
+                                                    }
+                                                } while (string.IsNullOrEmpty(newEmail));
+
+                                                updatePelanggan(idPelanggan, null, null, null, newEmail, null, conn);
+                                                inputValid = true;
+                                                break;
+
+                                            case 5:
+                                                Console.Clear();
+                                                string idPenjualan;
+                                                do
+                                                {
+                                                    Console.WriteLine("\nMasukkan Id Penjualan (Format: ip_00000):");
+                                                    idPenjualan = Console.ReadLine()?.Trim();
+                                                    if (string.IsNullOrEmpty(idPenjualan) || !idPenjualan.StartsWith("ip_") || idPenjualan.Length != 8 || !idPenjualan.Substring(3).All(char.IsDigit))
+                                                    {
+                                                        Console.WriteLine("Format ID Penjualan tidak valid. Harap masukkan sesuai format: ip_00000");
+                                                    }
+                                                } while (string.IsNullOrEmpty(idPenjualan) || !idPenjualan.StartsWith("ip_") || idPenjualan.Length != 8 || !idPenjualan.Substring(3).All(char.IsDigit));
+
+                                                updatePelanggan(idPelanggan, null, null, null, null, idPenjualan, conn);
+                                                inputValid = true;
+                                                break;
+
+                                            case 6:
+                                                Console.Clear();
+                                                inputValid = true;
+                                                goto EditMenu;
+
+                                            default:
+                                                Console.Clear();
+                                                Console.WriteLine("Pilihan tidak valid.");
+                                                break;
+                                        }
                                     }
                                     catch (Exception e)
                                     {
@@ -1063,17 +1588,60 @@ namespace PerusahaanAirMineral
 
         public void updatePelanggan(string idPelanggan, string newNamaPelanggan, string newAlamat, string newNoTelp, string newEmail, string idPenjualan, SqlConnection con)
         {
-            string str = "UPDATE Pelanggan SET Nama_pelanggan = @newNamaPelanggan, Alamat = @newAlamat, No_telepon = @newNoTelp, Email = @newEmail, Id_penjualan = @idPenjualan WHERE Id_pelanggan = @idPelanggan";
+            string str = "UPDATE Pelanggan SET ";
+
+            if (!string.IsNullOrEmpty(newNamaPelanggan))
+            {
+                str += "Nama_pelanggan = @newNamaPelanggan, ";
+            }
+            if (!string.IsNullOrEmpty(newAlamat))
+            {
+                str += "Alamat = @newAlamat, ";
+            }
+            if (!string.IsNullOrEmpty(newNoTelp))
+            {
+                str += "No_telepon = @newNoTelp, ";
+            }
+            if (!string.IsNullOrEmpty(newEmail))
+            {
+                str += "Email = @newEmail, ";
+            }
+            if (!string.IsNullOrEmpty(idPenjualan))
+            {
+                str += "Id_penjualan = @idPenjualan, ";
+            }
+
+            str = str.TrimEnd(',', ' ');
+
+            str += " WHERE Id_pelanggan = @idPelanggan";
+
             SqlCommand cmd = new SqlCommand(str, con);
             cmd.Parameters.AddWithValue("@idPelanggan", idPelanggan);
-            cmd.Parameters.AddWithValue("@newNamaPelanggan", newNamaPelanggan);
-            cmd.Parameters.AddWithValue("@newAlamat", newAlamat);
-            cmd.Parameters.AddWithValue("@newNoTelp", newNoTelp);
-            cmd.Parameters.AddWithValue("@newEmail", newEmail);
-            cmd.Parameters.AddWithValue("@idPenjualan", idPenjualan);
+            if (!string.IsNullOrEmpty(newNamaPelanggan))
+            {
+                cmd.Parameters.AddWithValue("@newNamaPelanggan", newNamaPelanggan);
+            }
+            if (!string.IsNullOrEmpty(newAlamat))
+            {
+                cmd.Parameters.AddWithValue("@newAlamat", newAlamat);
+            }
+            if (!string.IsNullOrEmpty(newNoTelp))
+            {
+                cmd.Parameters.AddWithValue("@newNoTelp", newNoTelp);
+            }
+            if (!string.IsNullOrEmpty(newEmail))
+            {
+                cmd.Parameters.AddWithValue("@newEmail", newEmail);
+            }
+            if (!string.IsNullOrEmpty(idPenjualan))
+            {
+                cmd.Parameters.AddWithValue("@idPenjualan", idPenjualan);
+            }
+
             cmd.ExecuteNonQuery();
             Console.WriteLine("Data Berhasil Diubah");
         }
+
 
         public void deletePelanggan(string idPelanggan, SqlConnection con)
         {
@@ -1084,12 +1652,12 @@ namespace PerusahaanAirMineral
         }
 
       public void searchPelanggan(string idPelanggan, SqlConnection con)
-{
-    SqlCommand cmd = new SqlCommand("SELECT * FROM Pelanggan WHERE Id_pelanggan = @idPelanggan", con);
-    cmd.Parameters.AddWithValue("@idPelanggan", idPelanggan);
-    SqlDataReader reader = cmd.ExecuteReader();
-    if (reader.HasRows)
-    {
+        {
+            SqlCommand cmd = new SqlCommand("SELECT * FROM Pelanggan WHERE Id_pelanggan = @idPelanggan", con);
+            cmd.Parameters.AddWithValue("@idPelanggan", idPelanggan);
+            SqlDataReader reader = cmd.ExecuteReader();
+            if (reader.HasRows)
+        {
         while (reader.Read())
         {
             Console.WriteLine("ID Pelanggan  : " + reader["Id_pelanggan"]);
@@ -1099,13 +1667,27 @@ namespace PerusahaanAirMineral
             Console.WriteLine("Email         : " + reader["Email"]);
             Console.WriteLine("ID Penjualan  : " + reader["Id_penjualan"]);
         }
-    }
-    else
-    {
-        Console.WriteLine("Data tidak ditemukan.");
-    }
-    reader.Close();
-}
+        }
+        else
+            {
+                Console.WriteLine("Data tidak ditemukan.");
+            }
+            reader.Close();
+        }
+        private static bool IsValidemail(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                return false;
+
+            try
+            {
+                return Regex.IsMatch(email, @"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", RegexOptions.IgnoreCase);
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return false;
+            }
+        }
 
 
         public bool isPelangganExists(string idPelanggan, SqlConnection con)
@@ -1138,36 +1720,103 @@ namespace PerusahaanAirMineral
                                 Console.Clear();
                                 Console.WriteLine("Simpan Produk di Gudang\n");
                                 bool inputValid = false;
+                                string idProduk = "";
+                                string namaProduk = "";
+                                int jumlahProduk = 0;
+                                DateTime tglMasuk = DateTime.MinValue;
+                                DateTime tglKadaluarsa = DateTime.MinValue;
+
                                 while (!inputValid)
                                 {
                                     try
                                     {
-                                        Console.WriteLine("Masukkan ID Produk (Format: p_0000):");
-                                        string idProduk = Console.ReadLine();
-                                        if (idProduk.ToLower() == "exit")
+                                        if (string.IsNullOrEmpty(idProduk))
                                         {
-                                            return;
+                                            Console.WriteLine("Masukkan ID Produk (Format: p_0000):");
+                                            idProduk = Console.ReadLine();
+                                            if (idProduk.ToLower() == "exit")
+                                            {
+                                                return;
+                                            }
+
+                                            if (string.IsNullOrEmpty(idProduk) || !idProduk.StartsWith("p_") || !idProduk.Substring(2).All(char.IsDigit) || idProduk.Length != 6)
+                                            {
+                                                throw new FormatException("Format ID Produk tidak valid. Harap masukkan sesuai format: p_0000");
+                                            }
+
+                                            if (isProductExists(idProduk, conn))
+                                            {
+                                                Console.WriteLine($"ID produk {idProduk} sudah ada. Masukkan ID produk yang berbeda.");
+
+                                                idProduk = "";
+                                                continue;
+                                            }
+
                                         }
 
-                                        if (!idProduk.StartsWith("p_") || !idProduk.Substring(2).All(char.IsDigit) || idProduk.Length != 6)
+                                        if (string.IsNullOrEmpty(namaProduk))
                                         {
-                                            throw new FormatException("Format ID Produk tidak valid. Harap masukkan sesuai format: p_0000");
+                                            Console.WriteLine("Masukkan Nama Produk:");
+                                            namaProduk = Console.ReadLine();
+                                            while (string.IsNullOrEmpty(namaProduk))
+                                            {
+                                                Console.WriteLine("Nama Produk tidak boleh kosong. Harap masukkan nama produk:");
+                                                namaProduk = Console.ReadLine()?.Trim();
+                                            }
                                         }
 
-                                        Console.WriteLine("Masukkan Nama Produk:");
-                                        string namaProduk = Console.ReadLine();
-                                        Console.WriteLine("Masukkan Jumlah:");
-                                        int jumlahProduk = int.Parse(Console.ReadLine());
-
-                                        if (jumlahProduk < 0)
+                                        if (jumlahProduk <= 0)
                                         {
-                                            throw new FormatException("Jumlah produk tidak valid. Harap masukkan angka tidak kurang dari 0.");
+                                            Console.WriteLine("Masukkan Jumlah:");
+                                            while (!int.TryParse(Console.ReadLine()?.Trim(), out jumlahProduk) || jumlahProduk < 0)
+                                            {
+                                                if (jumlahProduk < 0)
+                                                {
+                                                    Console.WriteLine("Jumlah produk tidak valid. Harap masukkan angka tidak kurang dari 0:");
+                                                }
+                                                else
+                                                {
+                                                    Console.WriteLine("Jumlah produk tidak valid. Harap masukkan angka:");
+                                                }
+                                            }
                                         }
 
-                                        Console.WriteLine("Masukkan Tanggal Masuk (YYYY-MM-DD):");
-                                        DateTime tglMasuk = DateTime.Parse(Console.ReadLine());
-                                        Console.WriteLine("Masukkan Tanggal Kadaluarsa (YYYY-MM-DD):");
-                                        DateTime tglKadaluarsa = DateTime.Parse(Console.ReadLine());
+                                        if (tglMasuk == DateTime.MinValue || tglMasuk < DateTime.Today)
+                                        {
+                                            Console.WriteLine("Masukkan Tanggal Masuk (YYYY-MM-DD):");
+                                            string inputTglMasuk = Console.ReadLine()?.Trim();
+                                            while (!DateTime.TryParseExact(inputTglMasuk, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out tglMasuk) || tglMasuk < DateTime.Today)
+                                            {
+                                                if (tglMasuk < DateTime.Today)
+                                                {
+                                                    Console.WriteLine("Tanggal masuk tidak boleh kurang dari hari ini. Harap masukkan kembali:");
+                                                }
+                                                else
+                                                {
+                                                    Console.WriteLine("Format tanggal tidak valid. Harap masukkan kembali (YYYY-MM-DD):");
+                                                }
+                                                inputTglMasuk = Console.ReadLine()?.Trim();
+                                            }
+                                        }
+
+                                        if (tglKadaluarsa == DateTime.MinValue || tglKadaluarsa < tglMasuk)
+                                        {
+                                            Console.WriteLine("Masukkan Tanggal Kadaluarsa (YYYY-MM-DD):");
+                                            string inputTglKadaluarsa = Console.ReadLine()?.Trim();
+                                            while (!DateTime.TryParseExact(inputTglKadaluarsa, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out tglKadaluarsa) || tglKadaluarsa < tglMasuk)
+                                            {
+                                                if (tglKadaluarsa < tglMasuk)
+                                                {
+                                                    Console.WriteLine("Tanggal kadaluarsa tidak boleh kurang dari tanggal masuk. Harap masukkan kembali:");
+                                                }
+                                                else
+                                                {
+                                                    Console.WriteLine("Format tanggal tidak valid. Harap masukkan kembali (YYYY-MM-DD):");
+                                                }
+                                                inputTglKadaluarsa = Console.ReadLine()?.Trim();
+                                            }
+                                        }
+
 
                                         simpanProdukGudang(idProduk, namaProduk, jumlahProduk, tglMasuk, tglKadaluarsa, conn);
 
@@ -1179,6 +1828,13 @@ namespace PerusahaanAirMineral
                                         Console.Clear();
                                         Console.WriteLine("\n" + ex.Message + "\n");
                                     }
+                                    catch (SqlException ex) when (ex.Number == 2627)
+                                    {
+                                        Console.WriteLine($"ID produk {idProduk} sudah ada. Masukkan ID produk yang berbeda.");
+                                        continue;
+                                    }
+
+
                                     catch (Exception e)
                                     {
                                         Console.WriteLine("\nGagal menyimpan produk di gudang.");
@@ -1187,8 +1843,6 @@ namespace PerusahaanAirMineral
                                 }
                             }
                             break;
-
-
                         case '2':
                             {
                                 Console.Clear();
@@ -1294,10 +1948,9 @@ namespace PerusahaanAirMineral
             r.Close();
         }
 
-
         public bool isProdukExists(string idProduk, SqlConnection con)
         {
-            SqlCommand cmd = new SqlCommand("SELECT COUNT(*) FROM Gudang WHERE Id_produk = @idProduk", con);
+            SqlCommand cmd = new SqlCommand("SELECT COUNT(*) FROM Produk WHERE Id_produk = @idProduk", con);
             cmd.Parameters.AddWithValue("@idProduk", idProduk);
             int count = (int)cmd.ExecuteScalar();
             return count > 0;
